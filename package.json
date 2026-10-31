@@ -1,0 +1,203 @@
+{
+  "name": "ejudge-vscode",
+  "displayName": "Ejudge",
+  "description": "Ejudge sidebar",
+  "version": "1.0.5",
+  "publisher": "XpozitiveZ",
+  "icon": "resources/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XpozitiveZ/ejudge-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ejudgeContainer",
+          "title": "Ejudge",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ejudgeContainer": [
+        {
+          "id": "ejudgeContests",
+          "name": "Contests"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ejudge.addContest",
+        "title": "Ejudge: Add contest",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ejudge.editContest",
+        "title": "Ejudge: Edit contest",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "ejudge.editSelectors",
+        "title": "Ejudge: Edit selectors (advanced, for version quirks)",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "ejudge.deleteContest",
+        "title": "Ejudge: Delete contest",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ejudge.openContest",
+        "title": "Ejudge: Open contest page"
+      },
+      {
+        "command": "ejudge.reloadContest",
+        "title": "Ejudge: Reload contest tab",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ejudge.back",
+        "title": "Ejudge: Go back",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "ejudge.forward",
+        "title": "Ejudge: Go forward",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "ejudge.showLogs",
+        "title": "Ejudge: Show logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "ejudge.itemClicked",
+        "title": "Ejudge: internal click handler"
+      },
+      {
+        "command": "ejudge.sendCurrentFileToContest",
+        "title": "Ejudge: отправить текущий файл в контест",
+        "icon": "$(cloud-upload)"
+      }
+    ],
+    "configuration": {
+      "title": "Ejudge",
+      "properties": {
+        "ejudge.ai.model": {
+          "type": "string",
+          "default": "gemini-3.5-flash-lite",
+          "description": "Модель Gemini для кнопки решения задачи. Используйте стабильный id из Google AI Studio."
+        },
+        "ejudge.ai.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Температура Gemini для решения задач: меньше — более предсказуемый код."
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "ejudge.addContest",
+          "when": "view == ejudgeContests",
+          "group": "navigation"
+        },
+        {
+          "command": "ejudge.showLogs",
+          "when": "view == ejudgeContests",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ejudge.editContest",
+          "when": "view == ejudgeContests",
+          "group": "inline"
+        },
+        {
+          "command": "ejudge.editSelectors",
+          "when": "view == ejudgeContests",
+          "group": "1_selectors"
+        },
+        {
+          "command": "ejudge.deleteContest",
+          "when": "view == ejudgeContests",
+          "group": "inline"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ejudge.back",
+          "when": "activeWebviewPanelId == 'ejudgeContest'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ejudge.forward",
+          "when": "activeWebviewPanelId == 'ejudgeContest'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ejudge.reloadContest",
+          "when": "activeWebviewPanelId == 'ejudgeContest'",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ejudge.sendCurrentFileToContest",
+          "group": "navigation@100",
+          "when": "resourceScheme == file || resourceScheme == untitled"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ejudge.editContest",
+          "when": "false"
+        },
+        {
+          "command": "ejudge.editSelectors",
+          "when": "false"
+        },
+        {
+          "command": "ejudge.deleteContest",
+          "when": "false"
+        },
+        {
+          "command": "ejudge.openContest",
+          "when": "false"
+        },
+        {
+          "command": "ejudge.itemClicked",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "socks-proxy-agent": "^8.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

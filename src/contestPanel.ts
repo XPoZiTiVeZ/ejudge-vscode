@@ -106,6 +106,12 @@ export async function reloadActiveContest() {
   info.panel.webview.postMessage({ action: 'reload' });
 }
 
+export async function watchActiveContest() {
+  const info = activeContestId ? panels.get(activeContestId) : undefined;
+  if (!info) return;
+  info.panel.webview.postMessage({ action: 'watch' });
+}
+
 function getShellHtml(iframeSrc: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -127,9 +133,17 @@ function getShellHtml(iframeSrc: string): string {
   // блокирует такой доступ между разными origin (эта панель — на своём
   // origin, iframe — на http://127.0.0.1:PORT). Теперь просим сам iframe
   // выполнить действие через postMessage — там правильный origin.
+  
   window.addEventListener('message', (event) => {
     const msg = event.data;
     if (!msg) return;
+
+    if (msg.type === 'ejudge-key') {
+      const forwarded = new KeyboardEvent(msg.eventType, { ...msg.init, bubbles: true, cancelable: true });
+      forwarded.ejudgeForwarded = true;
+      document.dispatchEvent(forwarded);
+      return;
+    }
 
     if (msg.action) {
       frame.contentWindow.postMessage({ ejudgeShellAction: msg.action }, '*');
@@ -149,6 +163,7 @@ function getShellHtml(iframeSrc: string): string {
   });
 
   window.addEventListener('keydown', (event) => {
+    if (event.ejudgeForwarded) return;
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     frame.contentWindow.postMessage(

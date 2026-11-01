@@ -58,8 +58,7 @@ export const CLIENT_SCRIPT = String.raw`
     if (msg.ejudgeShellAction === 'back') history.back();
     else if (msg.ejudgeShellAction === 'forward') history.forward();
     else if (msg.ejudgeShellAction === 'reload') location.reload();
-    else if (msg.ejudgeShellAction === 'prevProblem') stepProblem(-1);
-    else if (msg.ejudgeShellAction === 'nextProblem') stepProblem(1);
+    else if (msg.ejudgeShellAction === 'watch') { startWatch(); location.reload(); }
   });
 
   function showPageMessage(text, isError) {
@@ -115,119 +114,6 @@ export const CLIENT_SCRIPT = String.raw`
       });
     });
   }
-
-  // ---------- Gemini: одна кнопка (создать / открыть) + кнопка стирания ----------
-  var languageMenu = null;
-
-  function closeLanguageMenu() {
-    if (languageMenu) { languageMenu.remove(); languageMenu = null; }
-  }
-
-  function openAiAnswer() {
-    fetch(apiUrl('/ejudge-api/ai-answer?contest=' + encodeURIComponent(CONTEST_ID)))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data.ok) { showPageMessage(data.error || 'Нет сохранённого ответа ИИ.', true); return; }
-        window.parent.postMessage({
-          type: 'ejudge-open-source',
-          filename: data.filename || 'ai-solution.txt',
-          content: data.code || '',
-          language: data.language || 'plaintext'
-        }, '*');
-      })
-      .catch(function (e) { log('error', 'open AI answer failed: ' + e); showPageMessage('Не удалось открыть ответ ИИ: ' + e, true); });
-  }
-
-  function generateAiAnswer(button, languageName) {
-    closeLanguageMenu();
-    var oldText = button.textContent;
-    var oldTitle = button.title;
-    button.disabled = true;
-    button.textContent = '…';
-    button.title = 'Gemini генерирует решение…';
-
-    postJson('/ejudge-api/ai-generate', { contest: CONTEST_ID, language: languageName })
-      .then(function () {
-        // Перезагрузка нужна, чтобы кнопка перешла в режим "открыть".
-        location.reload();
-      })
-      .catch(function (error) {
-        log('error', 'AI generate failed: ' + error);
-        showPageMessage('Не удалось сгенерировать решение: ' + error.message, true);
-        button.disabled = false;
-        button.textContent = oldText;
-        button.title = oldTitle;
-      });
-  }
-
-  // Выбор языка из списка, который ejudge показывает в форме отправки.
-  // Если язык один (или фиксированный) — выбирается сразу.
-  function showLanguageMenu(button, languages) {
-    closeLanguageMenu();
-    languageMenu = document.createElement('div');
-    languageMenu.style.cssText =
-      'position:absolute;z-index:2147483000;min-width:220px;max-height:50vh;overflow:auto;' +
-      'background:#252526;color:#eee;border:1px solid #555;border-radius:6px;' +
-      'box-shadow:0 8px 24px rgba(0,0,0,.45);padding:4px 0;font-size:13px;';
-    var rect = button.getBoundingClientRect();
-    languageMenu.style.left = (rect.left + window.scrollX) + 'px';
-    languageMenu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-
-    var title = document.createElement('div');
-    title.textContent = 'Язык решения';
-    title.style.cssText = 'padding:6px 12px;color:#a9a9a9;font-size:11px;text-transform:uppercase;';
-    languageMenu.appendChild(title);
-
-    languages.forEach(function (name) {
-      var row = document.createElement('div');
-      row.textContent = name;
-      row.style.cssText = 'padding:6px 12px;cursor:pointer;';
-      row.onmouseenter = function () { row.style.background = '#3a3d41'; };
-      row.onmouseleave = function () { row.style.background = 'transparent'; };
-      row.onclick = function () { generateAiAnswer(button, name); };
-      languageMenu.appendChild(row);
-    });
-    document.documentElement.appendChild(languageMenu);
-  }
-
-  function onAiButtonClick(e) {
-    var button = e.currentTarget;
-    e.stopPropagation();
-    if (button.getAttribute('data-saved') === '1') {
-      openAiAnswer();
-      return;
-    }
-    var languages = [];
-    try { languages = JSON.parse(button.getAttribute('data-languages') || '[]'); } catch (err) { languages = []; }
-    if (languages.length > 1) showLanguageMenu(button, languages);
-    else generateAiAnswer(button, languages[0] || '');
-  }
-
-  function onAiClearClick() {
-    postJson('/ejudge-api/ai-clear', { contest: CONTEST_ID })
-      .then(function () { location.reload(); })
-      .catch(function (error) {
-        log('error', 'AI clear failed: ' + error);
-        showPageMessage('Не удалось стереть решение: ' + error.message, true);
-      });
-  }
-
-  function patchAiButtons() {
-    var main = document.getElementById('ejudgeAiButton');
-    if (main && !main.dataset.ejudgePatched) {
-      main.dataset.ejudgePatched = '1';
-      main.addEventListener('click', onAiButtonClick);
-    }
-    var clear = document.getElementById('ejudgeAiClear');
-    if (clear && !clear.dataset.ejudgePatched) {
-      clear.dataset.ejudgePatched = '1';
-      clear.addEventListener('click', onAiClearClick);
-    }
-  }
-
-  document.addEventListener('click', function (e) {
-    if (languageMenu && !languageMenu.contains(e.target)) closeLanguageMenu();
-  });
 
   // Кружки статусов слева от условия: скрытая группа не показывает кружки (кроме текущей задачи).
   function refreshRail(key, hidden) {
@@ -350,10 +236,90 @@ export const CLIENT_SCRIPT = String.raw`
     stepProblem(e.key === 'ArrowRight' ? 1 : -1);
   });
 
+  // ---------- Автообновление после отправки ----------
+  var WATCH_KEY = 'ejudge.watch.' + CONTEST_ID;
+  var WATCH_DELAY_MS = 100;
+  var WATCH_TOTAL_MS = 3 * 60 * 1000;
+  var WATCH_APPEAR_MS = 20 * 1000;
+
+  function runIds() {
+    var ids = [];
+    document.querySelectorAll('.runs-table tbody tr').forEach(function (tr) {
+      var td = tr.querySelector('td');
+      if (td) ids.push(td.textContent.trim());
+    });
+    return ids;
+  }
+  function startWatch() {
+    try { sessionStorage.setItem(WATCH_KEY, JSON.stringify({ started: Date.now(), known: runIds() })); } catch (e) { /* ignore */ }
+  }
+  function stopWatch() {
+    try { sessionStorage.removeItem(WATCH_KEY); } catch (e) { /* ignore */ }
+  }
+  function scheduleReload() {
+    setTimeout(function () {
+      if (document.hidden) { scheduleReload(); return; }
+      location.reload();
+    }, WATCH_DELAY_MS);
+  }
+  function patchSubmitForms() {
+    document.querySelectorAll('form.submit-form').forEach(function (form) {
+      if (form.dataset.ejudgeWatchPatched) return;
+      form.dataset.ejudgeWatchPatched = '1';
+      form.addEventListener('submit', startWatch);
+    });
+  }
+  function runWatch() {
+    var raw = null;
+    try { raw = sessionStorage.getItem(WATCH_KEY); } catch (e) { /* ignore */ }
+    if (!raw) return;
+    var state;
+    try { state = JSON.parse(raw); } catch (e) { stopWatch(); return; }
+    var age = Date.now() - state.started;
+    if (age > WATCH_TOTAL_MS) {
+      stopWatch();
+      showPageMessage('Автообновление остановлено: проверка не завершилась за 3 минуты.', true);
+      return;
+    }
+    var fresh = null;
+    document.querySelectorAll('.runs-table tbody tr').forEach(function (tr) {
+      var td = tr.querySelector('td');
+      var id = td ? td.textContent.trim() : '';
+      if (!fresh && id && state.known.indexOf(id) === -1) fresh = tr;
+    });
+    if (!fresh) {
+      if (age > WATCH_APPEAR_MS) {
+        stopWatch();
+        showPageMessage('Новая посылка не появилась в таблице.', true);
+        return;
+      }
+      scheduleReload();
+      return;
+    }
+    if (!isRunFinal(fresh)) { scheduleReload(); return; }
+    stopWatch();
+    var resultCell = fresh.querySelector('td.result');
+    var runId = fresh.querySelector('td').textContent.trim();
+    showPageMessage('Посылка ' + runId + ': ' + (resultCell ? resultCell.textContent.trim() : ''), !fresh.classList.contains('ok'));
+  }
+
+  function isRunFinal(tr) {
+    var cell = tr.querySelector('td.result');
+    var text = cell ? cell.textContent.trim() : '';
+    var title = cell ? (cell.getAttribute('title') || '') : '';
+    var both = text + ' ' + title;
+    if (/(^|\s)PR(\s|$)/.test(both)) return true;
+    if (/компил|выполня|очеред|running|compiling|queued|judging/i.test(both)) return false;
+    if (tr.classList.contains('pending')) return false;
+    if (tr.classList.contains('ok') || tr.classList.contains('bad')) return true;
+    if (/^[A-Z]{2,3}$/.test(text)) return true;
+    return false;
+  }
+
   function scan() {
     patchRunLinks();
-    patchAiButtons();
     patchGroupEyes();
+    patchSubmitForms();
   }
 
   var scanScheduled = false;
@@ -369,7 +335,40 @@ export const CLIENT_SCRIPT = String.raw`
     scan();
     if (checkLoginFailure()) return;
     document.documentElement.style.visibility = 'visible';
+    runWatch();
   }
+
+  // ---------- Горячие клавиши VS Code, когда фокус внутри страницы ----------
+  // Страница лежит во вложенном iframe: VS Code её нажатий не видит, поэтому пересылаем их в оболочку.
+  // Исходное событие отменяем, чтобы браузер не выполнял своё действие (печать, поиск и т. п.).
+  // Сочетания, которые должны работать в самой странице, оставляем как есть.
+  var NATIVE_KEYS = { c: 1, a: 1, x: 1, v: 1, '+': 1, '-': 1, '=': 1, '0': 1 };
+
+  function isNativeShortcut(e) {
+    var key = (e.key || '').toLowerCase();
+    return (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && NATIVE_KEYS[key] === 1;
+  }
+
+  function forwardKey(eventType) {
+    return function (e) {
+      if (e.defaultPrevented) return;
+      if (eventType === 'keydown' && (e.ctrlKey || e.metaKey || e.altKey) && !isNativeShortcut(e)) {
+        e.preventDefault();
+      }
+      try {
+        window.parent.postMessage({
+          type: 'ejudge-key',
+          eventType: eventType,
+          init: {
+            key: e.key, code: e.code, keyCode: e.keyCode, repeat: e.repeat,
+            shiftKey: e.shiftKey, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey
+          }
+        }, '*');
+      } catch (err) { /* ignore */ }
+    };
+  }
+  document.addEventListener('keydown', forwardKey('keydown'));
+  document.addEventListener('keyup', forwardKey('keyup'));
 
   document.addEventListener('DOMContentLoaded', init);
   if (document.readyState !== 'loading') init();

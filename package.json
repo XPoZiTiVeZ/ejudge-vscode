@@ -2,7 +2,7 @@
   "name": "ejudge-vscode",
   "displayName": "Ejudge",
   "description": "Ejudge sidebar",
-  "version": "1.0.5",
+  "version": "1.0.16",
   "publisher": "XpozitiveZ",
   "icon": "resources/icon.png",
   "license": "MIT",
@@ -92,25 +92,22 @@
         "command": "ejudge.sendCurrentFileToContest",
         "title": "Ejudge: отправить текущий файл в контест",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "ejudge.syncNow",
+        "title": "Ejudge: синхронизировать контесты (GitHub Gist)",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "ejudge.setPassword",
+        "title": "Ejudge: изменить пароль контеста",
+        "icon": "$(key)"
+      },
+      {
+        "command": "ejudge.setProxyPassword",
+        "title": "Ejudge: изменить пароль прокси"
       }
     ],
-    "configuration": {
-      "title": "Ejudge",
-      "properties": {
-        "ejudge.ai.model": {
-          "type": "string",
-          "default": "gemini-3.5-flash-lite",
-          "description": "Модель Gemini для кнопки решения задачи. Используйте стабильный id из Google AI Studio."
-        },
-        "ejudge.ai.temperature": {
-          "type": "number",
-          "default": 0.2,
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Температура Gemini для решения задач: меньше — более предсказуемый код."
-        }
-      }
-    },
     "menus": {
       "view/title": [
         {
@@ -122,6 +119,21 @@
           "command": "ejudge.showLogs",
           "when": "view == ejudgeContests",
           "group": "navigation"
+        },
+        {
+          "command": "ejudge.syncNow",
+          "when": "view == ejudgeContests",
+          "group": "navigation"
+        },
+        {
+          "command": "ejudge.setPassword",
+          "when": "view == ejudgeContests",
+          "group": "1_secrets"
+        },
+        {
+          "command": "ejudge.setProxyPassword",
+          "when": "view == ejudgeContests",
+          "group": "1_secrets"
         }
       ],
       "view/item/context": [
@@ -183,9 +195,124 @@
         {
           "command": "ejudge.itemClicked",
           "when": "false"
+        },
+        {
+          "command": "ejudge.setPassword",
+          "when": "false"
+        },
+        {
+          "command": "ejudge.setProxyPassword",
+          "when": "false"
         }
       ]
-    }
+    },
+    "languageModelTools": [
+      {
+        "name": "get_ejudge_problem",
+        "displayName": "Условие задачи ejudge",
+        "modelDescription": "Возвращает условие (исходная разметка, формулы в LaTeX), ограничения, языки и краткую таблицу последних посылок задачи ejudge, открытой в панели контеста. Можно указать название другой задачи контеста.",
+        "toolReferenceName": "ejudgeProblem",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "problem": {
+              "type": "string",
+              "description": "Название задачи (например mz01-1). Пусто — открытая задача."
+            }
+          }
+        }
+      },
+      {
+        "name": "get_ejudge_last_submit",
+        "displayName": "Последняя посылка ejudge",
+        "modelDescription": "Возвращает полную информацию о последней посылке открытой задачи ejudge: вердикт, исходный код и отчёт по тестам.",
+        "toolReferenceName": "ejudgeLastSubmit",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_ejudge_submission",
+        "displayName": "Посылка ejudge по номеру",
+        "modelDescription": "Возвращает исходный код или отчёт по тестам посылки открытой задачи ejudge по её номеру.",
+        "toolReferenceName": "ejudgeSubmission",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "description": "Номер посылки"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "source",
+                "report"
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "kind"
+          ]
+        }
+      },
+      {
+        "name": "list_ejudge_problems",
+        "displayName": "Задачи контеста ejudge",
+        "modelDescription": "Возвращает список задач контеста ejudge со статусами, группами и временем сервера.",
+        "toolReferenceName": "ejudgeProblems",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_ejudge_problem",
+        "displayName": "Условие задачи ejudge",
+        "modelDescription": "Возвращает условие (исходная разметка, формулы в LaTeX), ограничения, языки и краткую таблицу последних посылок задачи ejudge, открытой в панели контеста. Можно указать название другой задачи контеста.",
+        "toolReferenceName": "ejudgeProblem",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "problem": {
+              "type": "string",
+              "description": "Название задачи (например mz01-1). Пусто — открытая задача."
+            }
+          }
+        }
+      },
+      {
+        "name": "submit_ejudge_problem",
+        "displayName": "Отправить решение в ejudge",
+        "modelDescription": "Отправляет решение в задачу ejudge, открытую в панели контеста. Передай либо file (путь к файлу решения), либо code вместе с fileName (имя с расширением языка, например solution.c). Тратит попытку, пользователь подтверждает вызов. Результат отправки приходит текстом.",
+        "toolReferenceName": "submitProblem",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Путь к файлу решения (абсолютный или от корня рабочей папки)."
+            },
+            "code": {
+              "type": "string",
+              "description": "Исходный код решения, если файла нет."
+            },
+            "fileName": {
+              "type": "string",
+              "description": "Имя файла с расширением языка, например solution.c. Обязательно вместе с code."
+            }
+          }
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

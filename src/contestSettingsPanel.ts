@@ -17,9 +17,7 @@ export async function openContestSettings(
   }
   const panel = vscode.window.createWebviewPanel('ejudgeContestSettings', existing ? `Настройки: ${existing.label}` : 'Новый контест', vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: false });
   panels.set(key, panel);
-  const password = existing ? (await provider.getPassword(existing.id)) || '' : '';
-  const proxyPassword = existing ? (await provider.getProxyPassword(existing.id)) || '' : '';
-  panel.webview.html = getFormHtml(existing, password, proxyPassword);
+  panel.webview.html = getFormHtml(existing);
   panel.webview.onDidReceiveMessage(async (msg) => {
     if (msg.type === 'save') {
       const data: ContestFormData = msg.data;
@@ -28,8 +26,9 @@ export async function openContestSettings(
         return;
       }
       if (existing) data.id = existing.id;
-      await provider.upsertContest(data);
+      const id = await provider.upsertContest(data);
       vscode.window.showInformationMessage(`Контест "${data.label}" сохранён.`);
+      void provider.askMissingSecrets(id);
       panel.dispose();
     } else if (msg.type === 'cancel') {
       panel.dispose();
@@ -42,7 +41,7 @@ export async function openContestSettings(
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
-function getFormHtml(existing: Contest | undefined, password: string, proxyPassword: string): string {
+function getFormHtml(existing: Contest | undefined): string {
   const c = existing;
   return `<!DOCTYPE html>
 <html>
@@ -83,9 +82,7 @@ function getFormHtml(existing: Contest | undefined, password: string, proxyPassw
 
   <label>Логин</label>
   <input type="text" id="login" value="${esc(c?.login || '')}" />
-
-  <label>Пароль${existing ? ' (оставьте пустым, чтобы не менять)' : ''}</label>
-  <input type="password" id="password" value="${esc(password)}" />
+  <div class="hint">Пароль VS Code спросит отдельным полем ввода при сохранении и первом входе.</div>
 
   <div class="row">
     <input type="checkbox" id="useProxy" ${c?.proxy ? 'checked' : ''} />
@@ -101,57 +98,7 @@ function getFormHtml(existing: Contest | undefined, password: string, proxyPassw
     <input type="number" id="proxyPort" value="${c?.proxy?.port || 1080}" />
     <label>Пользователь (опционально)</label>
     <input type="text" id="proxyUsername" value="${esc(c?.proxy?.username || '')}" />
-    <label>Пароль (опционально)${c?.proxy ? ', оставьте пустым, чтобы не менять' : ''}</label>
-    <input type="password" id="proxyPassword" value="${esc(proxyPassword)}" />
-  </fieldset>
-
-  <div class="row">
-    <input type="checkbox" id="hideAi" ${c?.hideAi ? 'checked' : ''} />
-    <label style="margin:0;">Скрыть ИИ-функции (кнопки генерации и показа ответа)</label>
-  </div>
-
-  <fieldset>
-  <legend>Gemini AI</legend>
-
-  <div class="hint">
-    Ключ хранится локально в защищённом хранилище VS Code
-    и не синхронизируется между устройствами.
-  </div>
-
-  <label>Gemini API key${existing ? ' (оставьте пустым, чтобы не менять)' : ''}</label>
-  <input
-    type="password"
-    id="aiApiKey"
-    value=""
-    placeholder="AIza…"
-    autocomplete="new-password"
-    spellcheck="false"
-  />
-
-  <div class="row">
-    <input type="checkbox" id="useAiProxy" ${c?.aiProxy ? 'checked' : ''} />
-    <label style="margin:0;">Использовать отдельный SOCKS5-прокси для Gemini</label>
-  </div>
-
-  <fieldset id="aiProxyFields" style="${c?.aiProxy ? '' : 'display:none;'}">
-    <legend>Gemini SOCKS5 proxy</legend>
-
-    <label>Хост</label>
-    <input type="text" id="aiProxyHost" value="${esc(c?.aiProxy?.host || '')}" />
-
-    <label>Порт</label>
-    <input type="number" id="aiProxyPort" value="${c?.aiProxy?.port || 1080}" />
-
-    <label>Пользователь (опционально)</label>
-    <input type="text" id="aiProxyUsername" value="${esc(c?.aiProxy?.username || '')}" />
-
-    <label>Пароль (опционально)${c?.aiProxy ? ', пусто = не менять' : ''}</label>
-    <input
-      type="password"
-      id="aiProxyPassword"
-      value=""
-      autocomplete="new-password"
-    />
+    <div class="hint">Пароль VS Code спросит отдельным полем ввода при сохранении и первом входе.</div>
   </fieldset>
 </fieldset>
 
@@ -169,33 +116,18 @@ function getFormHtml(existing: Contest | undefined, password: string, proxyPassw
   useProxy.addEventListener('change', () => {
     proxyFields.style.display = useProxy.checked ? '' : 'none';
   });
-  const useAiProxy = document.getElementById('useAiProxy');
-  const aiProxyFields = document.getElementById('aiProxyFields');
-  useAiProxy.addEventListener('change', () => {
-    aiProxyFields.style.display = useAiProxy.checked ? '' : 'none';
-  });
 
   document.getElementById('saveBtn').addEventListener('click', () => {
     const data = {
       label: document.getElementById('label').value,
       url: document.getElementById('url').value,
       groupRegex: document.getElementById('groupRegex').value.trim() || undefined,
-      hideAi: document.getElementById('hideAi').checked,
       login: document.getElementById('login').value,
-      password: document.getElementById('password').value || undefined
     };
     if (useProxy.checked) {
       data.proxyHost = document.getElementById('proxyHost').value;
       data.proxyPort = parseInt(document.getElementById('proxyPort').value, 10) || 1080;
       data.proxyUsername = document.getElementById('proxyUsername').value || undefined;
-      data.proxyPassword = document.getElementById('proxyPassword').value || undefined;
-    }
-    data.aiApiKey = document.getElementById('aiApiKey').value || undefined;
-    if (useAiProxy.checked) {
-      data.aiProxyHost = document.getElementById('aiProxyHost').value;
-      data.aiProxyPort = parseInt(document.getElementById('aiProxyPort').value, 10) || 1080;
-      data.aiProxyUsername = document.getElementById('aiProxyUsername').value || undefined;
-      data.aiProxyPassword = document.getElementById('aiProxyPassword').value || undefined;
     }
     vscode.postMessage({ type: 'save', data });
   });

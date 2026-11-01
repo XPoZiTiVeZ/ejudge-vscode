@@ -1,13 +1,23 @@
-import { ContestInfo, ProblemDetail, ProblemSummary, SubmissionRow, DotStatus } from './ejudgeParsers';
+import {
+  ContestInfo,
+  ProblemDetail,
+  ProblemSummary,
+  SubmissionRow,
+  DotStatus,
+} from "./ejudgeParsers";
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[c] as string));
+  return value.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c] as string,
+  );
 }
 
 const CSS = `
@@ -101,8 +111,6 @@ html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-sys
 ::-webkit-scrollbar-thumb:hover{background-color:rgba(55,148,255,.65)}
 ::-webkit-scrollbar-thumb:active{background-color:rgba(55,148,255,.90)}
 ::-webkit-scrollbar-corner{background:transparent}
-.ai-btn{font-size:14px;line-height:1}
-.ai-btn:disabled{opacity:.5;cursor:default}
 .pgroup-eye{margin-left:2px;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px 4px;border-radius:4px;display:flex;align-items:center;opacity:.65}
 .pgroup-eye:hover{opacity:1;background:rgba(255,255,255,.08)}
 .pgroup-eye .eye-off{display:none}
@@ -135,7 +143,11 @@ const ICON_GENERIC = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none
 const ICON_LIST = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`;
 const ICON_LIMITS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>`;
 
-const LINK_ICONS: Record<string, string> = { source: ICON_SOURCE, report: ICON_REPORT, generic: ICON_GENERIC };
+const LINK_ICONS: Record<string, string> = {
+  source: ICON_SOURCE,
+  report: ICON_REPORT,
+  generic: ICON_GENERIC,
+};
 
 const DROPDOWN_SCRIPT = `
 <script>
@@ -191,34 +203,38 @@ export interface RenderPageOptions {
   problem: ProblemDetail | null;
   submissions: SubmissionRow[];
   rawContentHtml?: string;
-  // Скрыть ИИ-кнопки (настройка контеста).
-  hideAi?: boolean;
-  // Для текущей задачи уже сохранён ответ ИИ.
-  aiAnswerSaved?: boolean;
   hrefBuilder(problem: ProblemSummary): string;
   formActionRewriter(action: string): string;
   clientScriptTag?: string;
+  cachedAt?: number;
 }
 
 function renderHeader(info: ContestInfo): string {
   const cells: Array<[string, string]> = [
-    ['Время на сервере', info.serverTime || '—'],
-    ['Время начала турнира', info.contestStartTime || '—'],
-    ['Продолжительность', info.duration || '—']
+    ["Время на сервере", info.serverTime || "—"],
+    ["Время начала турнира", info.contestStartTime || "—"],
+    ["Продолжительность", info.duration || "—"],
   ];
   return `<div class="header">
-    <div class="participant">${escapeHtml(info.participantName || '')}</div>
-    <div class="info-grid">${cells.map(([label, value]) => `<div class="info-cell"><div class="info-label">${escapeHtml(label)}</div><div class="info-value">${escapeHtml(value)}</div></div>`).join('')}</div>
+    <div class="participant">${escapeHtml(info.participantName || "")}</div>
+    <div class="info-grid">${cells.map(([label, value]) => `<div class="info-cell"><div class="info-label">${escapeHtml(label)}</div><div class="info-value">${escapeHtml(value)}</div></div>`).join("")}</div>
   </div>`;
 }
 
-function renderProblemsList(problems: ProblemSummary[], hrefBuilder: (problem: ProblemSummary) => string): string {
-  if (!problems.length) return '<div class="empty" style="padding:10px 14px"></div>';
-  return problems.map((problem) => {
-    const status = problem.status === 'OK' ? 'ok' : problem.status === 'WA' ? 'wa' : '';
-    const active = problem.status === 'CURRENT' ? ' active' : '';
-    return `<a class="${status}${active}" href="${escapeHtml(hrefBuilder(problem))}"><span class="${status}">${escapeHtml(problem.id)}</span></a>`;
-  }).join('');
+function renderProblemsList(
+  problems: ProblemSummary[],
+  hrefBuilder: (problem: ProblemSummary) => string,
+): string {
+  if (!problems.length)
+    return '<div class="empty" style="padding:10px 14px"></div>';
+  return problems
+    .map((problem) => {
+      const status =
+        problem.status === "OK" ? "ok" : problem.status === "WA" ? "wa" : "";
+      const active = problem.status === "CURRENT" ? " active" : "";
+      return `<a class="${status}${active}" href="${escapeHtml(hrefBuilder(problem))}"><span class="${status}">${escapeHtml(problem.id)}</span></a>`;
+    })
+    .join("");
 }
 
 const ICON_CHEVRON = `<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
@@ -228,29 +244,35 @@ const ICON_EYE = `<svg class="eye-on" viewBox="0 0 24 24" width="15" height="15"
 function renderGroupedProblems(
   groups: ProblemGroup[],
   hrefBuilder: (problem: ProblemSummary) => string,
-  interactive: boolean
+  interactive: boolean,
 ): string {
-  return groups.map((group) => {
-    if (group.problems.length === 1) return renderProblemsList(group.problems, hrefBuilder);
-    // Без клиентского скрипта вернуть скрытую группу нельзя, поэтому её просто не показываем.
-    if (group.hidden && !interactive) return '';
-    const open = group.collapsed || group.hidden ? '' : ' open';
-    const hidden = group.hidden ? ' hidden-group' : '';
-    const eye = interactive
-      ? `<button type="button" class="pgroup-eye" title="${group.hidden ? 'Показать группу' : 'Скрыть группу'}" aria-label="Скрыть или показать группу">${ICON_EYE}</button>`
-      : '';
-    return `<div class="pgroup${open}${hidden}" data-key="${escapeHtml(group.key)}"><div class="pgroup-head">${ICON_CHEVRON}<span class="pgroup-name">${escapeHtml(group.name)}</span><span class="pgroup-count">${group.problems.length}</span>${eye}</div><div class="pgroup-items">${renderProblemsList(group.problems, hrefBuilder)}</div></div>`;
-  }).join('');
+  return groups
+    .map((group) => {
+      if (group.problems.length === 1)
+        return renderProblemsList(group.problems, hrefBuilder);
+      // Без клиентского скрипта вернуть скрытую группу нельзя, поэтому её просто не показываем.
+      if (group.hidden && !interactive) return "";
+      const open = group.collapsed || group.hidden ? "" : " open";
+      const hidden = group.hidden ? " hidden-group" : "";
+      const eye = interactive
+        ? `<button type="button" class="pgroup-eye" title="${group.hidden ? "Показать группу" : "Скрыть группу"}" aria-label="Скрыть или показать группу">${ICON_EYE}</button>`
+        : "";
+      return `<div class="pgroup${open}${hidden}" data-key="${escapeHtml(group.key)}"><div class="pgroup-head">${ICON_CHEVRON}<span class="pgroup-name">${escapeHtml(group.name)}</span><span class="pgroup-count">${group.problems.length}</span>${eye}</div><div class="pgroup-items">${renderProblemsList(group.problems, hrefBuilder)}</div></div>`;
+    })
+    .join("");
 }
 
 function renderProblemsToggle(
   problems: ProblemSummary[],
   hrefBuilder: (problem: ProblemSummary) => string,
   groups: ProblemGroup[] | undefined,
-  interactive: boolean
+  interactive: boolean,
 ): string {
-  if (!problems.length) return '';
-  const list = groups && groups.length ? renderGroupedProblems(groups, hrefBuilder, interactive) : renderProblemsList(problems, hrefBuilder);
+  if (!problems.length) return "";
+  const list =
+    groups && groups.length
+      ? renderGroupedProblems(groups, hrefBuilder, interactive)
+      : renderProblemsList(problems, hrefBuilder);
   return `<div class="topbar-actions"><button id="ejudgeProblemsToggle" class="problems-toggle" title="Список задач" aria-label="Список задач">${ICON_LIST}</button>
   <div id="ejudgeProblemsPanel" class="problems-panel">${list}</div></div>`;
 }
@@ -266,39 +288,30 @@ const GROUP_SCRIPT = `<script>
 })();
 </script>`;
 
-interface AiUi {
-  // Названия языков из формы ejudge: если больше одного — клиент покажет выбор.
-  languages: string[];
-  saved: boolean;
-}
-
-// Одна кнопка ИИ: пока ответа нет — генерирует (✨), когда есть — открывает (💡);
-// рядом с открывающей кнопкой — кнопка ✕, стирающая сохранённый ответ.
-function renderAiButtons(ai: AiUi): string {
-  const languages = escapeHtml(JSON.stringify(ai.languages));
-  if (ai.saved) {
-    return `<button type="button" id="ejudgeAiButton" class="limits-toggle ai-btn" data-saved="1" data-languages="${languages}" title="Открыть ответ ИИ" aria-label="Открыть ответ ИИ">💡</button>`
-      + `<button type="button" id="ejudgeAiClear" class="limits-toggle ai-btn" title="Стереть решение ИИ" aria-label="Стереть решение ИИ">✕</button>`;
-  }
-  return `<button type="button" id="ejudgeAiButton" class="limits-toggle ai-btn" data-saved="0" data-languages="${languages}" title="Решить с помощью ИИ (Gemini)" aria-label="Решить с помощью ИИ">✨</button>`;
-}
-
 // Кнопка сразу после заголовка задачи — раскрывает/скрывает таблицу
 // ограничений. По умолчанию (при загрузке страницы) таблица скрыта.
-function renderTitleRow(problem: ProblemDetail, ai: AiUi | null): string {
+function renderTitleRow(problem: ProblemDetail): string {
   const toggle = problem.limits.length
     ? `<button id="ejudgeLimitsToggle" class="limits-toggle" title="Ограничения задачи" aria-label="Ограничения задачи">${ICON_LIMITS}</button>`
-    : '';
-  return `<div class="title-row"><h1 class="problem-title">${escapeHtml(problem.title)}</h1>${toggle}${ai ? renderAiButtons(ai) : ''}</div>`;
+    : "";
+  return `<div class="title-row"><h1 class="problem-title">${escapeHtml(problem.title)}</h1>${toggle}</div>`;
 }
 
 function renderLimits(problem: ProblemDetail): string {
-  if (!problem.limits.length) return '';
-  return `<div id="ejudgeLimitsPanel" class="limits" style="display:none">${problem.limits.map((limit) => `<div class="limit"><b>${escapeHtml(limit.label)}</b>${escapeHtml(limit.value)}</div>`).join('')}</div>`;
+  if (!problem.limits.length) return "";
+  return `<div id="ejudgeLimitsPanel" class="limits" style="display:none">${problem.limits.map((limit) => `<div class="limit"><b>${escapeHtml(limit.label)}</b>${escapeHtml(limit.value)}</div>`).join("")}</div>`;
 }
 
-function renderSubmissions(rows: SubmissionRow[], formActionRewriter: (action: string) => string): string {
-  if (!rows.length) return '';
+function renderCacheNotice(savedAt: number): string {
+  const date = new Date(savedAt).toLocaleString('ru-RU');
+  return `<div class="cache-notice">Задача сейчас недоступна — показана сохранённая копия от ${escapeHtml(date)}.</div>`;
+}
+
+function renderSubmissions(
+  rows: SubmissionRow[],
+  formActionRewriter: (action: string) => string,
+): string {
+  if (!rows.length) return "";
 
   const safeHref = (href: string) => {
     try {
@@ -311,14 +324,18 @@ function renderSubmissions(rows: SubmissionRow[], formActionRewriter: (action: s
   return `<h2 class="runs-heading">Посылки</h2>
   <table class="runs-table"><thead><tr>
     <th>№</th><th>Время</th><th>Результат</th><th>Тесты</th><th>Баллы</th><th class="icon-col"></th>
-  </tr></thead><tbody>${rows.map((row) => `<tr class="${row.resultClass}">
+  </tr></thead><tbody>${rows
+    .map(
+      (row) => `<tr class="${row.resultClass}">
     <td>${escapeHtml(row.id)}</td>
     <td>${escapeHtml(row.time)}</td>
-    <td class="result" title="${escapeHtml(row.result)}">${escapeHtml(row.resultCode || '—')}</td>
-    <td>${escapeHtml(row.tests || '—')}</td>
-    <td>${escapeHtml(row.score || '—')}</td>
-    <td class="icon-col">${row.links.map((link) => `<a class="run-link" data-kind="${link.kind}" data-run-id="${escapeHtml(row.id)}" title="${escapeHtml(link.label)}" href="${escapeHtml(safeHref(link.href))}">${LINK_ICONS[link.kind]}</a>`).join('')}</td>
-  </tr>`).join('')}</tbody></table>`;
+    <td class="result" title="${escapeHtml(row.result)}">${escapeHtml(row.resultCode || "—")}</td>
+    <td>${escapeHtml(row.tests || "—")}</td>
+    <td>${escapeHtml(row.score || "—")}</td>
+    <td class="icon-col">${row.links.map((link) => `<a class="run-link" data-kind="${link.kind}" data-run-id="${escapeHtml(row.id)}" title="${escapeHtml(link.label)}" href="${escapeHtml(safeHref(link.href))}">${LINK_ICONS[link.kind]}</a>`).join("")}</td>
+  </tr>`,
+    )
+    .join("")}</tbody></table>`;
 }
 
 // ---------- Ряд кружков со статусами задач слева от условия ----------
@@ -339,32 +356,46 @@ interface RailSegment {
 
 function dotStatus(problem: ProblemSummary): DotStatus {
   if (problem.dotStatus) return problem.dotStatus;
-  if (problem.status === 'CURRENT') return 'none';
-  return problem.status === 'OK' ? 'ok' : problem.status === 'WA' ? 'wa' : 'none';
+  if (problem.status === "CURRENT") return "none";
+  return problem.status === "OK"
+    ? "ok"
+    : problem.status === "WA"
+      ? "wa"
+      : "none";
 }
 
-function buildRailSegments(problems: ProblemSummary[], groups: ProblemGroup[] | undefined): RailSegment[] {
+function buildRailSegments(
+  problems: ProblemSummary[],
+  groups: ProblemGroup[] | undefined,
+): RailSegment[] {
   const toDot = (problem: ProblemSummary): RailDot => ({
     problem,
     status: dotStatus(problem),
-    current: problem.status === 'CURRENT'
+    current: problem.status === "CURRENT",
   });
   if (!groups || !groups.length) {
-    return [{ isGroup: false, key: '', hidden: false, dots: problems.map(toDot) }];
+    return [
+      { isGroup: false, key: "", hidden: false, dots: problems.map(toDot) },
+    ];
   }
   const segments: RailSegment[] = [];
   let plain: RailSegment | null = null;
   for (const group of groups) {
     if (group.problems.length === 1) {
       if (!plain) {
-        plain = { isGroup: false, key: '', hidden: false, dots: [] };
+        plain = { isGroup: false, key: "", hidden: false, dots: [] };
         segments.push(plain);
       }
       plain.dots.push(toDot(group.problems[0]));
       continue;
     }
     plain = null;
-    segments.push({ isGroup: true, key: group.key, hidden: group.hidden, dots: group.problems.map(toDot) });
+    segments.push({
+      isGroup: true,
+      key: group.key,
+      hidden: group.hidden,
+      dots: group.problems.map(toDot),
+    });
   }
   return segments;
 }
@@ -372,35 +403,41 @@ function buildRailSegments(problems: ProblemSummary[], groups: ProblemGroup[] | 
 function renderStatusRail(
   segments: RailSegment[],
   hrefBuilder: (problem: ProblemSummary) => string,
-  interactive: boolean
+  interactive: boolean,
 ): string {
   // Без клиентского скрипта вернуть скрытую группу нельзя, поэтому её не рендерим
   // (кроме случая, когда в ней текущая задача).
   const shown = interactive
     ? segments
-    : segments.filter((segment) => !segment.hidden || segment.dots.some((dot) => dot.current));
-  if (!shown.length) return '';
+    : segments.filter(
+        (segment) => !segment.hidden || segment.dots.some((dot) => dot.current),
+      );
+  if (!shown.length) return "";
 
   let firstVisibleDone = false;
   const parts = shown.map((segment) => {
     const hasCurrent = segment.dots.some((dot) => dot.current);
-    const classes = ['rail-seg'];
-    if (segment.hidden) classes.push('seg-hidden');
+    const classes = ["rail-seg"];
+    if (segment.hidden) classes.push("seg-hidden");
     if (segment.hidden && !hasCurrent) {
-      classes.push('seg-empty');
+      classes.push("seg-empty");
     } else if (!firstVisibleDone) {
-      classes.push('seg-first');
+      classes.push("seg-first");
       firstVisibleDone = true;
     }
-    const groupAttr = segment.isGroup ? ` data-group="${escapeHtml(segment.key)}"` : '';
-    const dots = segment.dots.map((dot) => {
-      const title = escapeHtml(dot.problem.name || dot.problem.id);
-      const cls = `status-dot ${dot.status}${dot.current ? ' current' : ''}`;
-      return `<a class="${cls}" href="${escapeHtml(hrefBuilder(dot.problem))}" title="${title}" aria-label="${title}"></a>`;
-    }).join('');
-    return `<div class="${classes.join(' ')}"${groupAttr}>${dots}</div>`;
+    const groupAttr = segment.isGroup
+      ? ` data-group="${escapeHtml(segment.key)}"`
+      : "";
+    const dots = segment.dots
+      .map((dot) => {
+        const title = escapeHtml(dot.problem.name || dot.problem.id);
+        const cls = `status-dot ${dot.status}${dot.current ? " current" : ""}`;
+        return `<a class="${cls}" href="${escapeHtml(hrefBuilder(dot.problem))}" title="${title}" aria-label="${title}"></a>`;
+      })
+      .join("");
+    return `<div class="${classes.join(" ")}"${groupAttr}>${dots}</div>`;
   });
-  return `<nav class="status-rail" aria-label="Статусы задач">${parts.join('')}</nav>`;
+  return `<nav class="status-rail" aria-label="Статусы задач">${parts.join("")}</nav>`;
 }
 
 // Высота шапки нужна, чтобы ряд кружков прилипал сразу под ней.
@@ -415,30 +452,33 @@ const RAIL_SCRIPT = `<script>
 })();
 </script>`;
 
-export function renderContestPage(options: RenderPageOptions, includeClientScript: boolean): string {
+export function renderContestPage(
+  options: RenderPageOptions,
+  includeClientScript: boolean,
+): string {
   const {
-    contestInfo, problems, problemGroups, problem, submissions, rawContentHtml,
-    hideAi, aiAnswerSaved, hrefBuilder, formActionRewriter, clientScriptTag
+    contestInfo,
+    problems,
+    problemGroups,
+    problem,
+    submissions,
+    rawContentHtml,
+    hrefBuilder,
+    formActionRewriter,
+    clientScriptTag,
   } = options;
 
-  // ИИ-кнопки нужны только внутри webview VS Code и если они не скрыты в настройках контеста.
-  const ai: AiUi | null = problem && includeClientScript && !hideAi
-    ? {
-        languages: problem.languages.length
-          ? problem.languages.map((language) => language.name)
-          : problem.fixedLanguageLabel
-            ? [problem.fixedLanguageLabel]
-            : [],
-        saved: !!aiAnswerSaved
-      }
-    : null;
-
-  const rail = problem && problems.length
-    ? renderStatusRail(buildRailSegments(problems, problemGroups), hrefBuilder, includeClientScript)
-    : '';
+  const rail =
+    problem && problems.length
+      ? renderStatusRail(
+          buildRailSegments(problems, problemGroups),
+          hrefBuilder,
+          includeClientScript,
+        )
+      : "";
 
   const body = problem
-    ? `${renderTitleRow(problem, ai)}${renderLimits(problem)}<article class="statement">${problem.statementHtml}</article>${renderSubmissions(submissions, formActionRewriter)}`
+    ? `${renderTitleRow(problem)}${renderLimits(problem)}<article class="statement">${problem.statementHtml}</article>${renderSubmissions(submissions, formActionRewriter)}`
     : submissions.length
       ? renderSubmissions(submissions, formActionRewriter)
       : rawContentHtml
@@ -465,7 +505,7 @@ ${renderProblemsToggle(problems, hrefBuilder, problemGroups, includeClientScript
 ${DROPDOWN_SCRIPT}
 ${GROUP_SCRIPT}
 ${RAIL_SCRIPT}
-${includeClientScript && clientScriptTag ? clientScriptTag : ''}
+${includeClientScript && clientScriptTag ? clientScriptTag : ""}
 </body>
 </html>`;
 }

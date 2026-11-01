@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import { ContestsProvider, ContestItem } from './contestsProvider';
 import { EjudgeProxy } from './proxyServer';
-import { openContestPanel, reloadActiveContest, goBackActive, goForwardActive, getActiveContestId, onActiveContestChanged } from './contestPanel';
+import { openContestPanel, reloadActiveContest, goBackActive, goForwardActive, getActiveContestId, onActiveContestChanged, watchActiveContest  } from './contestPanel';
 import { registerSubmitButtons } from './submitButtons';
 import { openContestSettings } from './contestSettingsPanel';
+import { registerEjudgeTools } from './ejudgeTools';
 
 const DOUBLE_CLICK_MS = 400;
 
@@ -19,13 +20,14 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(output);
   output.appendLine('[ejudge] extension activated');
 
-  const provider = new ContestsProvider(context);
+  const provider = new ContestsProvider(context, (message) => output.appendLine(`[ejudge] ${message}`));
   await provider.init();
   context.subscriptions.push(provider);
   vscode.window.registerTreeDataProvider('ejudgeContests', provider);
 
   const proxy = new EjudgeProxy(provider, output);
   const port = await proxy.start();
+  registerEjudgeTools(context, proxy);
   output.appendLine(`[ejudge] local proxy listening on 127.0.0.1:${port}`);
   context.subscriptions.push({ dispose: () => proxy.dispose() });
 
@@ -44,7 +46,9 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('ejudge.reloadContest', () => reloadActiveContest()),
     vscode.commands.registerCommand('ejudge.back', () => goBackActive()),
     vscode.commands.registerCommand('ejudge.forward', () => goForwardActive()),
-    
+    vscode.commands.registerCommand('ejudge.syncNow', () => provider.syncNow(true)),
+    vscode.commands.registerCommand('ejudge.setPassword', (item: ContestItem) => provider.changeSecret(item, 'login')),
+    vscode.commands.registerCommand('ejudge.setProxyPassword', (item: ContestItem) => provider.changeSecret(item, 'proxy')),    
 
     vscode.commands.registerCommand('ejudge.openContest', async (contestId: string) => {
       const contest = provider.getContest(contestId);
@@ -115,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`✔ ${fileName}: ${result.message}`);
         // Перезагружаем панель контеста, чтобы сразу увидеть новую посылку
         // в таблице "Посылки" под условием задачи, а не только уведомление.
-        await reloadActiveContest();
+        await watchActiveContest();
       } else {
         vscode.window.showErrorMessage(`✖ ${fileName}: ${result.message}`);
       }

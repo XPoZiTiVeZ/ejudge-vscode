@@ -229,8 +229,8 @@ const VERDICT_TEXT_TO_CODE: Record<string, string> = {
   'начало виртуального соревнования для пользователя. служебная метка, не является записью о решении': 'VS',
   'конец виртуального соревнования для пользователя. служебная метка, не является записью о решении': 'VT'
 };
-const OK_CODES = new Set(['OK', 'AC']);
-const PENDING_CODES = new Set(['PD', 'PR', 'RU', 'CD', 'CG', 'AV', 'FR']);
+const OK_CODES = new Set(['OK', 'AC', 'PR']);
+const PENDING_CODES = new Set(['PD', 'RU', 'CD', 'CG', 'AV']);
 function normalizeVerdictText(text: string): string {
   return text.trim().replace(/\.+$/, '').toLowerCase();
 }
